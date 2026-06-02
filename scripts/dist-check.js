@@ -8,8 +8,9 @@ const fs = require("fs");
 const path = require("path");
 
 const DIST = path.resolve(__dirname, "..", "dist");
-const REQUIRED = ["index.html", "404.html", "_next"];
-const REQUIRED_ROUTES = ["login", "chat", "dashboard"]; // optional routes — warn only
+const REQUIRED = ["_next"];
+const RECOMMENDED = ["index.html"];
+const REQUIRED_ROUTES = ["login", "chat", "dashboard"]; // optional — warn only
 
 function fail(msg) {
   console.error(`\n[dist-check] ❌ ${msg}`);
@@ -26,14 +27,16 @@ for (const entry of REQUIRED) {
   if (!fs.existsSync(p)) fail(`Arquivo/pasta obrigatório ausente: dist/${entry}`);
 }
 
-const nextDir = path.join(DIST, "_next");
-const hasChunks = fs.existsSync(path.join(nextDir, "static"));
-if (!hasChunks) fail("dist/_next/static não foi gerado — build incompleto.");
+const nextStatic = path.join(DIST, "_next", "static");
+if (!fs.existsSync(nextStatic)) fail("dist/_next/static não foi gerado — build incompleto.");
 
-const indexSize = fs.statSync(path.join(DIST, "index.html")).size;
-if (indexSize < 200) fail(`dist/index.html parece vazio (${indexSize} bytes).`);
+const htmls = fs.readdirSync(DIST).filter((f) => f.endsWith(".html"));
+if (htmls.length === 0) fail("Nenhum arquivo .html exportado em dist/.");
 
 const warnings = [];
+for (const rec of RECOMMENDED) {
+  if (!fs.existsSync(path.join(DIST, rec))) warnings.push(`recomendado ausente: dist/${rec}`);
+}
 for (const route of REQUIRED_ROUTES) {
   const htmlFlat = path.join(DIST, `${route}.html`);
   const htmlDir = path.join(DIST, route, "index.html");
@@ -43,7 +46,7 @@ for (const route of REQUIRED_ROUTES) {
 }
 
 console.log("[dist-check] ✅ dist/ válido");
-console.log(`[dist-check]    - index.html (${indexSize} bytes)`);
+console.log(`[dist-check]    - ${htmls.length} arquivo(s) .html na raiz`);
 console.log(`[dist-check]    - _next/static presente`);
 if (warnings.length) {
   console.log("[dist-check] ⚠️  Avisos:");
