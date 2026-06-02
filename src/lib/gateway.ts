@@ -67,16 +67,26 @@ export async function askAgent(input: {
       }
       try {
         const json = JSON.parse(stdout) as Record<string, unknown>;
+        const result = (json.result ?? json) as Record<string, unknown>;
+        const meta = (result.meta ?? {}) as Record<string, unknown>;
         const content =
+          (meta.finalAssistantVisibleText as string | undefined) ??
+          (meta.finalAssistantRawText as string | undefined) ??
+          (result.content as string | undefined) ??
           (json.content as string | undefined) ??
           (json.response as string | undefined) ??
-          (json.message as string | undefined) ??
           "";
         resolve({
           ok: json.ok !== false,
-          content: String(content),
-          runId: (json.runId as string | undefined) ?? undefined,
-          durationMs: (json.durationMs as number | undefined) ?? undefined,
+          content: String(content).trim(),
+          runId:
+            (meta.runId as string | undefined) ??
+            (result.runId as string | undefined) ??
+            (json.runId as string | undefined),
+          durationMs:
+            (meta.durationMs as number | undefined) ??
+            (result.durationMs as number | undefined) ??
+            (json.durationMs as number | undefined),
           raw: json,
         });
       } catch (err) {
