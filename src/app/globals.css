@@ -5,20 +5,20 @@
 @layer base {
   :root {
     --background: #0a0a0a;
-    --foreground: #e5e5e5;
+    --foreground: #f5f5f5;
     --card: #141414;
-    --card-foreground: #e5e5e5;
-    --primary: #ec4899;
+    --card-foreground: #f5f5f5;
+    --primary: #dc2626;
     --primary-foreground: #ffffff;
-    --secondary: #1a1a2e;
-    --secondary-foreground: #e5e5e5;
+    --secondary: #1a1a1a;
+    --secondary-foreground: #f5f5f5;
     --muted: #1f1f1f;
     --muted-foreground: #a1a1aa;
-    --accent: #8b5cf6;
-    --accent-foreground: #ffffff;
+    --accent: #27272a;
+    --accent-foreground: #f5f5f5;
     --border: #27272a;
     --input: #27272a;
-    --ring: #ec4899;
+    --ring: #dc2626;
     --radius: 0.75rem;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;

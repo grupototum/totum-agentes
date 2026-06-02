@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Brain, ArrowRight } from "lucide-react";
 import { getSession } from "@/lib/session";
+import { AuthSplitScreen } from "@/components/ui/auth-split-screen";
 
 export const dynamic = "force-dynamic";
 
@@ -15,36 +14,26 @@ export default async function LoginPage({ searchParams }: PageProps) {
   const { err } = await searchParams;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-2">
-            <Brain className="w-6 h-6 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">Agentes Totum</h1>
-          <p className="text-sm text-muted-foreground">
-            Acesse seu time de agentes IA
-          </p>
+    <AuthSplitScreen
+      logo={
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground text-base font-bold">
+            T
+          </span>
+          <span className="text-xl font-semibold tracking-tight">totum agentes</span>
         </div>
-
-        {err && (
-          <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-center">
-            Falha no login: {err}
-          </div>
-        )}
-
-        <Link
-          href="/api/auth/login"
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          Entrar com Keycloak
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-
-        <p className="text-xs text-center text-muted-foreground">
-          Auth via realm Totum (SSO)
-        </p>
-      </div>
-    </div>
+      }
+      title="Bem-vindo de volta."
+      description="Acesse seu time de agentes IA com sua conta Totum."
+      imageSrc="/totum-robot.png"
+      imageAlt="Robô Totum segurando uma garrafa com a legenda Hydrated. Upgraded."
+      loginHref="/api/auth/login"
+      error={err}
+      footnote={
+        <>
+          Problemas pra entrar? Fale com <span className="text-foreground">@israel</span>.
+        </>
+      }
+    />
   );
 }
