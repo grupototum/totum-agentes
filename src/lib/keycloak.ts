@@ -4,10 +4,14 @@ import { env } from "./env";
 
 let cached: { as: oauth.AuthorizationServer; expiresAt: number } | null = null;
 
+// Keycloak roda em loopback HTTP (http://127.0.0.1:8180) — oauth4webapi exige
+// allowInsecureRequests pra aceitar non-HTTPS issuer.
+const insecure = { [oauth.allowInsecureRequests]: true } as const;
+
 export async function getAS(): Promise<oauth.AuthorizationServer> {
   if (cached && cached.expiresAt > Date.now()) return cached.as;
   const issuer = new URL(env.KEYCLOAK_ISSUER);
-  const res = await oauth.discoveryRequest(issuer, { algorithm: "oidc" });
+  const res = await oauth.discoveryRequest(issuer, { algorithm: "oidc", ...insecure });
   const as = await oauth.processDiscoveryResponse(issuer, res);
   cached = { as, expiresAt: Date.now() + 5 * 60_000 };
   return as;
@@ -61,7 +65,8 @@ export async function exchangeCode(input: {
     noneAuth,
     params,
     env.KEYCLOAK_REDIRECT_URI,
-    input.codeVerifier
+    input.codeVerifier,
+    insecure
   );
   const tokens = await oauth.processAuthorizationCodeResponse(as, client(), tokenRes, {
     expectedNonce: input.nonce,
