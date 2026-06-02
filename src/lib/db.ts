@@ -1,78 +1,49 @@
-"use client";
+import "server-only";
+import { Pool } from "pg";
+import { env } from "./env";
 
-const DB_NAME = "totum-agentes";
-const DB_VERSION = 1;
-const STORE_MESSAGES = "messages";
-
-interface MessageRow {
-  id: string;
-  agentId: string;
-  role: "user" | "agent";
-  content: string;
-  timestamp: number;
+declare global {
+  // eslint-disable-next-line no-var
+  var __pgPool: Pool | undefined;
 }
 
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onerror = () => reject(req.error);
-    req.onsuccess = () => resolve(req.result);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_MESSAGES)) {
-        const store = db.createObjectStore(STORE_MESSAGES, { keyPath: "id" });
-        store.createIndex("agentId", "agentId", { unique: false });
-        store.createIndex("timestamp", "timestamp", { unique: false });
-      }
-    };
+export const pool: Pool =
+  global.__pgPool ??
+  new Pool({
+    connectionString: env.DATABASE_URL,
+    max: 5,
+    idleTimeoutMillis: 30000,
   });
+
+if (process.env.NODE_ENV !== "production") {
+  global.__pgPool = pool;
 }
 
-export async function saveMessage(msg: MessageRow): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_MESSAGES, "readwrite");
-    const store = tx.objectStore(STORE_MESSAGES);
-    const req = store.put(msg);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+export async function query<T = unknown>(
+  text: string,
+  params?: unknown[]
+): Promise<{ rows: T[] }> {
+  const res = await pool.query(text, params as never);
+  return { rows: res.rows as T[] };
 }
 
-export async function getMessages(agentId: string): Promise<MessageRow[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_MESSAGES, "readonly");
-    const store = tx.objectStore(STORE_MESSAGES);
-    const idx = store.index("agentId");
-    const req = idx.getAll(agentId);
-    req.onsuccess = () => {
-      const rows: MessageRow[] = req.result || [];
-      rows.sort((a, b) => a.timestamp - b.timestamp);
-      resolve(rows);
-    };
-    req.onerror = () => reject(req.error);
-  });
+export async function upsertUser(input: {
+  sub: string;
+  email?: string | null;
+  name?: string | null;
+}): Promise<{ id: string; keycloak_sub: string; email: string | null; name: string | null }> {
+  const { rows } = await query<{
+    id: string;
+    keycloak_sub: string;
+    email: string | null;
+    name: string | null;
+  }>(
+    `INSERT INTO users (keycloak_sub, email, name)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (keycloak_sub) DO UPDATE
+       SET email = EXCLUDED.email, name = EXCLUDED.name
+     RETURNING id, keycloak_sub, email, name`,
+    [input.sub, input.email ?? null, input.name ?? null]
+  );
+  return rows[0];
 }
-
-export async function clearMessages(agentId: string): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_MESSAGES, "readwrite");
-    const store = tx.objectStore(STORE_MESSAGES);
-    const idx = store.index("agentId");
-    const req = idx.openCursor(agentId);
-    req.onsuccess = () => {
-      const cursor = req.result;
-      if (cursor) {
-        cursor.delete();
-        cursor.continue();
-      } else {
-        resolve();
-      }
-    };
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export type { MessageRow };
