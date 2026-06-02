@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/dist-check.js",
+    "dist-check": "node scripts/dist-check.js",
+    "prepublish-check": "next build && node scripts/dist-check.js",
     "start": "next start",
     "lint": "next lint"
   },
