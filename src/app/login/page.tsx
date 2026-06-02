@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
       }
       title="Bem-vindo de volta."
       description="Acesse seu time de agentes IA com sua conta Totum."
-      imageSrc="/totum-robot.png"
+      imageSrc="/totum-robot.webp"
       imageAlt="Robô Totum segurando uma garrafa com a legenda Hydrated. Upgraded."
       loginHref="/api/auth/login"
       error={err}
