@@ -1,19 +1,7 @@
-export interface AgentDef {
-  id: string;
-  name: string;
-  emoji: string;
-  description: string;
-}
-
-// IDs canônicos confirmados em /root/.openclaw/docs/GATEWAY_API_FOR_AGENTES_UI.md
-export const AGENTS: AgentDef[] = [
-  { id: "main", name: "Pepper", emoji: "🌶️", description: "CEO digital / generalista" },
-  { id: "jonathan", name: "Jonathan", emoji: "✍️", description: "Copywriter" },
-  { id: "paulo", name: "Paulo", emoji: "💻", description: "Dev" },
-  { id: "amanda", name: "Amanda", emoji: "📋", description: "CRM" },
-  { id: "juliana", name: "Juliana", emoji: "⚙️", description: "Ops" },
-];
-
-export function findAgent(id: string): AgentDef | undefined {
-  return AGENTS.find((a) => a.id === id);
-}
+/**
+ * Re-export compat layer.
+ * Catálogo real está em agents-data.ts (com departamentos, hierarquia, examples).
+ * Mantemos AGENTS/findAgent/AgentDef aqui pra não quebrar imports existentes.
+ */
+export type { AgentDef } from "./agents-data";
+export { AGENT_DEFS as AGENTS, findAgent } from "./agents-data";
