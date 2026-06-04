@@ -5,7 +5,11 @@ import { toast } from "sonner";
 import { LogOut, Send, Loader2, User as UserIcon, Trash2, MessagesSquare } from "lucide-react";
 import type { AgentDef } from "@/lib/agents";
 import { cn } from "@/lib/utils";
+
 import { relativeTime } from "@/lib/format";
+
+import { MessageContent } from "@/components/chat/MessageContent";
+
 
 interface Message {
   id: string;
@@ -393,7 +397,7 @@ export default function ChatClient({ agents, user }: Props) {
                 )}
                 <div
                   className={cn(
-                    "max-w-[70%] px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed",
+                    "max-w-[75%] px-4 py-3 text-sm leading-relaxed",
                     isUser
                       ? "rounded-2xl text-white"
                       : isSystem
@@ -419,7 +423,10 @@ export default function ChatClient({ agents, user }: Props) {
                           }
                   }
                 >
-                  {m.content}
+                  <MessageContent
+                    content={m.content}
+                    variant={isUser ? "user" : isSystem ? "system" : "assistant"}
+                  />
                 </div>
                 {isUser && (
                   <div className="h-8 w-8 rounded-full bg-elevated flex items-center justify-center shrink-0">
