@@ -33,10 +33,13 @@ type ConvScope = "agent" | "all";
 interface Props {
   agents: AgentDef[];
   user: { name: string; email: string | null };
+  initialAgentId?: string;
 }
 
-export default function ChatClient({ agents, user }: Props) {
-  const [agent, setAgent] = useState<AgentDef>(agents[0]);
+export default function ChatClient({ agents, user, initialAgentId }: Props) {
+  const initial =
+    (initialAgentId && agents.find((a) => a.id === initialAgentId)) || agents[0];
+  const [agent, setAgent] = useState<AgentDef>(initial);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
