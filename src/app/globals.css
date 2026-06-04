@@ -177,6 +177,97 @@
   }
 }
 
+/* === Markdown (totum-md) === */
+.totum-md {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--white-soft);
+}
+.totum-md > * + * { margin-top: 0.85em; }
+.totum-md h1,
+.totum-md h2,
+.totum-md h3,
+.totum-md h4 {
+  color: var(--white);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+}
+.totum-md h1 { font-size: 22px; }
+.totum-md h2 { font-size: 19px; }
+.totum-md h3 { font-size: 16px; }
+.totum-md h4 { font-size: 14px; font-weight: 400; }
+.totum-md p { margin: 0; }
+.totum-md a {
+  color: var(--brand-red-light);
+  text-decoration: underline;
+  text-decoration-color: rgba(239, 154, 154, 0.4);
+  text-underline-offset: 2px;
+}
+.totum-md a:hover { color: var(--brand-red-bright); }
+.totum-md strong, .totum-md b { color: var(--white); font-weight: 400; }
+.totum-md em { font-style: italic; opacity: 0.92; }
+.totum-md ul, .totum-md ol { padding-left: 1.4em; margin: 0; }
+.totum-md ul { list-style: disc; }
+.totum-md ol { list-style: decimal; }
+.totum-md li { margin-top: 0.25em; }
+.totum-md li::marker { color: var(--muted-foreground); }
+.totum-md blockquote {
+  border-left: 2px solid var(--brand-red-vibrant);
+  padding: 0.1em 0 0.1em 1em;
+  color: var(--text-muted);
+  margin: 0;
+}
+.totum-md hr {
+  border: 0;
+  height: 1px;
+  background: hsla(0, 0%, 100%, 0.08);
+  margin: 1em 0;
+}
+.totum-md table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  display: block;
+  overflow-x: auto;
+}
+.totum-md th, .totum-md td {
+  text-align: left;
+  padding: 6px 10px;
+  box-shadow: inset 0 -1px 0 hsla(0, 0%, 100%, 0.08);
+}
+.totum-md th { color: var(--white); font-weight: 400; background: hsla(0, 0%, 100%, 0.03); }
+.totum-md code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.totum-md-pre {
+  margin: 0.5em 0;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px hsla(0, 0%, 100%, 0.06);
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.totum-md-pre code { padding: 0; background: transparent; }
+
+/* hljs syntax — Totum aligned */
+.totum-md .hljs { color: var(--white-soft); background: transparent; }
+.totum-md .hljs-comment, .totum-md .hljs-quote { color: #6c6781; font-style: italic; }
+.totum-md .hljs-keyword, .totum-md .hljs-selector-tag, .totum-md .hljs-subst { color: var(--brand-red-light); }
+.totum-md .hljs-number, .totum-md .hljs-literal, .totum-md .hljs-variable,
+.totum-md .hljs-template-variable, .totum-md .hljs-tag .hljs-attr { color: #f5b8a3; }
+.totum-md .hljs-string, .totum-md .hljs-doctag, .totum-md .hljs-regexp { color: #c9b5ff; }
+.totum-md .hljs-title, .totum-md .hljs-section, .totum-md .hljs-selector-id,
+.totum-md .hljs-name { color: var(--white); }
+.totum-md .hljs-type, .totum-md .hljs-class .hljs-title { color: #a6e3ff; }
+.totum-md .hljs-built_in, .totum-md .hljs-builtin-name { color: #ffd197; }
+.totum-md .hljs-meta { color: #9ca3af; }
+.totum-md .hljs-deletion { background: rgba(217, 22, 22, 0.15); }
+.totum-md .hljs-addition { background: rgba(53, 166, 112, 0.15); }
+.totum-md .hljs-strong { font-weight: 400; color: var(--white); }
+
 /* Scrollbar dark */
 ::-webkit-scrollbar {
   width: 10px;
