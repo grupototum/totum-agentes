@@ -9,6 +9,21 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Tokens Totum
+        surface: "var(--surface)",
+        neutral: "var(--neutral)",
+        elevated: "var(--elevated)",
+        "hover-surface": "var(--hover-surface)",
+        "warm-rust": "var(--warm-rust)",
+        "cool-graphite": "var(--cool-graphite)",
+        "brand-red-bright": "var(--brand-red-bright)",
+        "brand-red-vibrant": "var(--brand-red-vibrant)",
+        "brand-red-light": "var(--brand-red-light)",
+        "brand-purple-bright": "var(--brand-purple-bright)",
+        tertiary: "var(--tertiary)",
+        success: "var(--success)",
+        "text-soft": "var(--white-soft)",
+        // shadcn aliases
         background: "var(--background)",
         foreground: "var(--foreground)",
         card: "var(--card)",
@@ -31,6 +46,18 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        pill: "9999px",
+      },
+      fontSize: {
+        "display-hero": ["72px", { lineHeight: "1", letterSpacing: "-0.02em", fontWeight: "300" }],
+        "display-large": ["54px", { lineHeight: "1", letterSpacing: "-0.02em", fontWeight: "300" }],
+        "section-heading": ["48px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "300" }],
+        "subheading-lg": ["38px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "300" }],
+        "subheading": ["32px", { lineHeight: "1.25", letterSpacing: "-0.02em", fontWeight: "300" }],
+        "body-lg": ["20px", { lineHeight: "1.25", fontWeight: "300" }],
+      },
+      letterSpacing: {
+        title: "-0.02em",
       },
     },
   },
