@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AGENTS, getOrchestrator, specialists, type AgentEntry } from "@/lib/agents-data";
+import { activeSubordinates, getOrchestrator, type AgentEntry } from "@/lib/agents-data";
 import { cn } from "@/lib/utils";
 
 interface NodeProps {
@@ -51,7 +51,11 @@ function Node({ agent, size = "md" }: NodeProps) {
 
 export function HierarchyTree() {
   const orchestrator = getOrchestrator();
-  const sp = specialists();
+  const sp = activeSubordinates();
+  const cols = Math.max(sp.length, 1);
+  const xs = Array.from({ length: cols }, (_, i) =>
+    Math.round(120 + (i * 560) / Math.max(cols - 1, 1))
+  );
 
   return (
     <div className="w-full">
@@ -69,12 +73,9 @@ export function HierarchyTree() {
               <stop offset="100%" stopColor="rgba(218,33,40,0.0)" />
             </linearGradient>
           </defs>
-          {/* Linha vertical centro: do orquestrador até a barra horizontal */}
           <line x1="400" y1="60" x2="400" y2="120" stroke="url(#totum-line)" strokeWidth="1.5" />
-          {/* Barra horizontal */}
-          <line x1="120" y1="120" x2="680" y2="120" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-          {/* 4 verticais até cada especialista */}
-          {[120, 307, 493, 680].map((x) => (
+          <line x1={xs[0]} y1="120" x2={xs[xs.length - 1]} y2="120" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+          {xs.map((x) => (
             <line
               key={x}
               x1={x}
@@ -88,11 +89,12 @@ export function HierarchyTree() {
         </svg>
 
         <div className="relative flex flex-col items-center gap-12">
-          {/* Orquestrador */}
           <Node agent={orchestrator} size="lg" />
 
-          {/* Especialistas */}
-          <div className="grid grid-cols-4 gap-4 w-full max-w-2xl">
+          <div
+            className="grid gap-4 w-full max-w-2xl"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+          >
             {sp.map((a) => (
               <div key={a.id} className="flex justify-center">
                 <Node agent={a} />
@@ -112,7 +114,7 @@ export function HierarchyTree() {
         </div>
         <div className="totum-card p-5">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
-            Especialistas
+            Especialistas ativos
           </div>
           <div className="grid grid-cols-2 gap-4">
             {sp.map((a) => (
@@ -121,6 +123,10 @@ export function HierarchyTree() {
           </div>
         </div>
       </div>
+
+      <p className="text-center text-[11px] text-muted-foreground mt-2">
+        Apenas agentes <span className="text-text-soft">online</span> aparecem na hierarquia. Demais no catálogo abaixo.
+      </p>
     </div>
   );
 }

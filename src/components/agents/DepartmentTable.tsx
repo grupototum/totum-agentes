@@ -2,9 +2,10 @@ import Link from "next/link";
 import {
   DEPARTMENTS,
   agentsByDepartment,
+  plannedByDepartment,
   type Department,
 } from "@/lib/agents-data";
-import { StatusPill } from "./StatusPill";
+import { StatusPill, PlannedPill } from "./StatusPill";
 
 const ACCENT_BG: Record<Department["accent"], string> = {
   red: "rgba(218,33,40,0.12)",
@@ -12,22 +13,14 @@ const ACCENT_BG: Record<Department["accent"], string> = {
   blue: "rgba(7,122,199,0.12)",
 };
 
-const ACCENT_DOT: Record<Department["accent"], string> = {
-  red: "bg-primary",
-  purple: "bg-brand-purple-bright",
-  blue: "bg-secondary",
-};
-
 export function DepartmentTable() {
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {DEPARTMENTS.map((d) => {
         const team = agentsByDepartment(d.id);
+        const planned = plannedByDepartment(d.id);
         return (
-          <article
-            key={d.id}
-            className="totum-card p-6 flex flex-col gap-4"
-          >
+          <article key={d.id} className="totum-card p-6 flex flex-col gap-4">
             <header className="flex items-start gap-3">
               <div
                 className="h-10 w-10 rounded-xl flex items-center justify-center text-xl shrink-0"
@@ -45,32 +38,82 @@ export function DepartmentTable() {
               </div>
             </header>
             <p className="text-sm text-text-soft leading-relaxed">{d.description}</p>
-            <ul className="space-y-2 pt-2">
-              {team.map((a) => (
-                <li key={a.id}>
-                  <Link
-                    href={`/chat?agent=${a.id}`}
-                    className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-elevated/60 transition-colors group"
-                  >
-                    <span className="text-base">{a.emoji}</span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm text-white truncate">
-                        {a.name}
+
+            <div className="space-y-1">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                Time
+              </div>
+              <ul className="space-y-2">
+                {team.length === 0 && (
+                  <li className="text-xs text-muted-foreground italic px-2">
+                    (sem agentes ativos)
+                  </li>
+                )}
+                {team.map((a) => {
+                  const exposed = a.chatExposed && a.status === "online";
+                  const Wrap = ({ children }: { children: React.ReactNode }) =>
+                    exposed ? (
+                      <Link
+                        href={`/chat?agent=${a.id}`}
+                        className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-elevated/60 transition-colors"
+                      >
+                        {children}
+                      </Link>
+                    ) : (
+                      <div
+                        className="flex items-center gap-3 px-2 py-1.5 rounded-md opacity-60"
+                        title="Não exposto no chat"
+                      >
+                        {children}
+                      </div>
+                    );
+                  return (
+                    <li key={a.id}>
+                      <Wrap>
+                        <span className="text-base">{a.emoji}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm text-white truncate">
+                            {a.name}
+                          </span>
+                          <span className="block text-xs text-muted-foreground truncate">
+                            {a.role}
+                          </span>
+                        </span>
+                        <StatusPill status={a.status} />
+                      </Wrap>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            {planned.length > 0 && (
+              <div className="space-y-1 pt-2" style={{ boxShadow: "inset 0 1px 0 hsla(0,0%,100%,0.06)" }}>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1 pt-2">
+                  Planejado V2
+                </div>
+                <ul className="space-y-1.5">
+                  {planned.map((p) => (
+                    <li
+                      key={p.name}
+                      className="flex items-center gap-3 px-2 py-1.5 rounded-md opacity-70"
+                      title={p.note}
+                    >
+                      <span className="text-base">{p.emoji}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm text-text-soft truncate">
+                          {p.name}
+                        </span>
+                        <span className="block text-xs text-muted-foreground truncate">
+                          {p.role}
+                        </span>
                       </span>
-                      <span className="block text-xs text-muted-foreground truncate">
-                        {a.role}
-                      </span>
-                    </span>
-                    <StatusPill status={a.status} />
-                  </Link>
-                </li>
-              ))}
-              {team.length === 0 && (
-                <li className="text-xs text-muted-foreground italic px-2">
-                  (sem agentes ainda)
-                </li>
-              )}
-            </ul>
+                      <PlannedPill />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </article>
         );
       })}
