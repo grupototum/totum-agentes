@@ -6,11 +6,8 @@ import { LogOut, Send, Loader2, User as UserIcon, Trash2, MessagesSquare } from 
 import type { AgentDef } from "@/lib/agents";
 import { cn } from "@/lib/utils";
 import { streamSSE } from "@/lib/sse-client";
-
 import { relativeTime } from "@/lib/format";
-
 import { MessageContent } from "@/components/chat/MessageContent";
-
 
 interface Message {
   id: string;
@@ -46,12 +43,9 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-<<<<<<< HEAD
   const [streamingText, setStreamingText] = useState<string>("");
   const [pulseTick, setPulseTick] = useState<number>(0);
-=======
   const [convScope, setConvScope] = useState<ConvScope>("agent");
->>>>>>> origin/main
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const loadConversations = useCallback(
@@ -167,16 +161,8 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
           agent_id: agent.id,
         };
         setMessages((m) => [...m, finalMsg]);
-        if (streamedConvId) void loadConversations(agent.id);
+        if (streamedConvId) void loadConversations(agent.id, convScope);
       }
-<<<<<<< HEAD
-=======
-      if (data.conversation_id && data.conversation_id !== activeConvId) {
-        setActiveConvId(data.conversation_id);
-        void loadConversations(agent.id, convScope);
-      }
-      if (data.message) setMessages((m) => [...m, data.message!]);
->>>>>>> origin/main
     } catch (err) {
       const msg = err instanceof Error ? err.message : "erro";
       toast.error(msg);
