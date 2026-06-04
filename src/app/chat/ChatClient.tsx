@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { LogOut, Send, Loader2, User as UserIcon } from "lucide-react";
 import type { AgentDef } from "@/lib/agents";
 import { cn } from "@/lib/utils";
+import { streamSSE } from "@/lib/sse-client";
 
 interface Message {
   id: string;
@@ -33,6 +34,8 @@ export default function ChatClient({ agents, user }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [streamingText, setStreamingText] = useState<string>("");
+  const [pulseTick, setPulseTick] = useState<number>(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const loadConversations = useCallback(async (agentId: string) => {
@@ -68,6 +71,8 @@ export default function ChatClient({ agents, user }: Props) {
     if (!text || sending) return;
     setSending(true);
     setInput("");
+    setStreamingText("");
+    setPulseTick(0);
     const optimistic: Message = {
       id: `tmp-${Date.now()}`,
       role: "user",
@@ -76,33 +81,81 @@ export default function ChatClient({ agents, user }: Props) {
       agent_id: agent.id,
     };
     setMessages((m) => [...m, optimistic]);
+
+    let acc = "";
+    let streamedConvId: string | null = activeConvId;
+    let streamedMessageId: string | null = null;
+    let streamedCreatedAt = new Date().toISOString();
+
     try {
-      const r = await fetch("/api/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agent_id: agent.id, content: text, conversation_id: activeConvId }),
-      });
-      const data = (await r.json()) as {
-        conversation_id?: string;
-        message?: Message;
-        error?: string;
-        detail?: string;
-      };
-      if (!r.ok) {
-        toast.error(data.detail || data.error || "Falha ao enviar");
-        setMessages((m) => m.filter((x) => x.id !== optimistic.id));
-        return;
+      await streamSSE(
+        "/api/messages/stream",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            agent_id: agent.id,
+            content: text,
+            conversation_id: activeConvId,
+          }),
+        },
+        (ev) => {
+          const data = ev.data as Record<string, unknown>;
+          switch (ev.event) {
+            case "meta": {
+              const cid = data.conversation_id as string | undefined;
+              if (cid && cid !== activeConvId) {
+                streamedConvId = cid;
+                setActiveConvId(cid);
+              }
+              break;
+            }
+            case "pulse": {
+              setPulseTick(Number(data.tick) || 0);
+              break;
+            }
+            case "start": {
+              streamedMessageId = (data.message_id as string) ?? null;
+              break;
+            }
+            case "chunk": {
+              const t = String(data.text ?? "");
+              acc += t;
+              setStreamingText(acc);
+              break;
+            }
+            case "done": {
+              streamedMessageId = (data.message_id as string) ?? streamedMessageId;
+              streamedCreatedAt = (data.created_at as string) ?? streamedCreatedAt;
+              break;
+            }
+            case "error": {
+              const detail = String(data.detail ?? "gateway_error");
+              toast.error(detail);
+              break;
+            }
+          }
+        }
+      );
+
+      if (streamedMessageId && acc) {
+        const finalMsg: Message = {
+          id: streamedMessageId,
+          role: "assistant",
+          content: acc,
+          created_at: streamedCreatedAt,
+          agent_id: agent.id,
+        };
+        setMessages((m) => [...m, finalMsg]);
+        if (streamedConvId) void loadConversations(agent.id);
       }
-      if (data.conversation_id && data.conversation_id !== activeConvId) {
-        setActiveConvId(data.conversation_id);
-        void loadConversations(agent.id);
-      }
-      if (data.message) setMessages((m) => [...m, data.message!]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "erro";
       toast.error(msg);
       setMessages((m) => m.filter((x) => x.id !== optimistic.id));
     } finally {
+      setStreamingText("");
+      setPulseTick(0);
       setSending(false);
     }
   }, [input, sending, agent.id, activeConvId, loadConversations]);
@@ -315,11 +368,27 @@ export default function ChatClient({ agents, user }: Props) {
                 {agent.emoji}
               </div>
               <div
-                className="rounded-2xl bg-neutral px-4 py-3 text-sm flex items-center gap-2 text-muted-foreground"
+                className={cn(
+                  "rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-[75%]",
+                  streamingText
+                    ? "bg-neutral text-text-soft"
+                    : "bg-neutral text-muted-foreground flex items-center gap-2"
+                )}
                 style={{ boxShadow: "inset 0 0 0 1px hsla(0,0%,100%,0.08)" }}
               >
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>pensando…</span>
+                {streamingText ? (
+                  <span className="whitespace-pre-wrap">
+                    {streamingText}
+                    <span className="inline-block w-1.5 h-3.5 align-middle ml-0.5 bg-primary rounded-sm animate-pulse" />
+                  </span>
+                ) : (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>
+                      {agent.name} está pensando{".".repeat(((pulseTick - 1) % 3) + 1)}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           )}
