@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { LogOut, Send, Loader2, User as UserIcon } from "lucide-react";
+import { LogOut, Send, Loader2, User as UserIcon, Trash2, MessagesSquare } from "lucide-react";
 import type { AgentDef } from "@/lib/agents";
 import { cn } from "@/lib/utils";
+
+import { relativeTime } from "@/lib/format";
+
 import { MessageContent } from "@/components/chat/MessageContent";
+
 
 interface Message {
   id: string;
@@ -20,7 +24,11 @@ interface Conversation {
   agent_id: string;
   title: string | null;
   updated_at: string;
+  created_at?: string;
+  message_count?: number;
 }
+
+type ConvScope = "agent" | "all";
 
 interface Props {
   agents: AgentDef[];
@@ -34,14 +42,19 @@ export default function ChatClient({ agents, user }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [convScope, setConvScope] = useState<ConvScope>("agent");
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const loadConversations = useCallback(async (agentId: string) => {
-    const r = await fetch(`/api/conversations?agent_id=${agentId}`, { cache: "no-store" });
-    if (!r.ok) return;
-    const data = (await r.json()) as { conversations: Conversation[] };
-    setConversations(data.conversations);
-  }, []);
+  const loadConversations = useCallback(
+    async (agentId: string, scope: ConvScope = "agent") => {
+      const params = scope === "all" ? "?scope=all" : `?agent_id=${agentId}`;
+      const r = await fetch(`/api/conversations${params}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const data = (await r.json()) as { conversations: Conversation[] };
+      setConversations(data.conversations);
+    },
+    []
+  );
 
   const loadMessages = useCallback(async (convId: string) => {
     const r = await fetch(`/api/conversations/${convId}/messages`, { cache: "no-store" });
@@ -51,10 +64,10 @@ export default function ChatClient({ agents, user }: Props) {
   }, []);
 
   useEffect(() => {
-    void loadConversations(agent.id);
+    void loadConversations(agent.id, convScope);
     setActiveConvId(null);
     setMessages([]);
-  }, [agent.id, loadConversations]);
+  }, [agent.id, convScope, loadConversations]);
 
   useEffect(() => {
     if (activeConvId) void loadMessages(activeConvId);
@@ -96,7 +109,7 @@ export default function ChatClient({ agents, user }: Props) {
       }
       if (data.conversation_id && data.conversation_id !== activeConvId) {
         setActiveConvId(data.conversation_id);
-        void loadConversations(agent.id);
+        void loadConversations(agent.id, convScope);
       }
       if (data.message) setMessages((m) => [...m, data.message!]);
     } catch (err) {
@@ -106,12 +119,48 @@ export default function ChatClient({ agents, user }: Props) {
     } finally {
       setSending(false);
     }
-  }, [input, sending, agent.id, activeConvId, loadConversations]);
+  }, [input, sending, agent.id, activeConvId, loadConversations, convScope]);
 
   const newConversation = useCallback(() => {
     setActiveConvId(null);
     setMessages([]);
   }, []);
+
+  const deleteConversation = useCallback(
+    async (convId: string) => {
+      if (!confirm("Excluir essa conversa? Esta ação não pode ser desfeita.")) return;
+      const r = await fetch(`/api/conversations/${convId}`, { method: "DELETE" });
+      if (!r.ok) {
+        toast.error("Falha ao excluir");
+        return;
+      }
+      toast.success("Conversa excluída");
+      if (convId === activeConvId) {
+        setActiveConvId(null);
+        setMessages([]);
+      }
+      void loadConversations(agent.id, convScope);
+    },
+    [activeConvId, agent.id, convScope, loadConversations]
+  );
+
+  const selectConversation = useCallback(
+    (c: Conversation) => {
+      setActiveConvId(c.id);
+      // Se a conv pertence a outro agente, troca seleção
+      if (c.agent_id !== agent.id) {
+        const target = agents.find((a) => a.id === c.agent_id);
+        if (target) setAgent(target);
+      }
+    },
+    [agent.id, agents]
+  );
+
+  const agentEmojiById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const a of agents) map[a.id] = a.emoji;
+    return map;
+  }, [agents]);
 
   const orderedMessages = useMemo(() => messages, [messages]);
 
@@ -179,26 +228,101 @@ export default function ChatClient({ agents, user }: Props) {
               onClick={newConversation}
               className="text-xs text-primary hover:underline"
             >
-              Nova
+              + Nova
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-0.5">
+
+          {/* Toggle scope */}
+          <div
+            className="flex items-center mb-2 mx-1 rounded-full p-0.5 text-[11px]"
+            style={{ background: "var(--elevated)" }}
+          >
+            <button
+              onClick={() => setConvScope("agent")}
+              className={cn(
+                "flex-1 px-3 py-1 rounded-full transition-colors",
+                convScope === "agent" ? "bg-hover-surface text-white" : "text-muted-foreground"
+              )}
+            >
+              {agent.name}
+            </button>
+            <button
+              onClick={() => setConvScope("all")}
+              className={cn(
+                "flex-1 px-3 py-1 rounded-full transition-colors",
+                convScope === "all" ? "bg-hover-surface text-white" : "text-muted-foreground"
+              )}
+            >
+              Todas
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-0.5 pr-1">
             {conversations.length === 0 && (
-              <div className="text-xs text-muted-foreground px-2 py-2">Nenhuma ainda.</div>
+              <div className="flex flex-col items-center justify-center text-center text-xs text-muted-foreground py-8 gap-2">
+                <MessagesSquare className="h-5 w-5 opacity-50" />
+                <div>Nenhuma conversa ainda.</div>
+                <div className="text-[10px]">Mande sua primeira mensagem.</div>
+              </div>
             )}
-            {conversations.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setActiveConvId(c.id)}
-                className={cn(
-                  "w-full text-left px-2 py-1.5 rounded text-xs transition-colors truncate",
-                  c.id === activeConvId ? "bg-elevated text-white" : "text-text-soft hover:bg-elevated/60"
-                )}
-                title={c.title ?? ""}
-              >
-                {c.title || "(sem título)"}
-              </button>
-            ))}
+            {conversations.map((c) => {
+              const active = c.id === activeConvId;
+              return (
+                <div
+                  key={c.id}
+                  className={cn(
+                    "group relative w-full rounded-md transition-colors",
+                    active ? "bg-elevated" : "hover:bg-elevated/60"
+                  )}
+                  style={
+                    active
+                      ? { boxShadow: "inset 0 0 0 1px hsla(0,0%,100%,0.08)" }
+                      : undefined
+                  }
+                >
+                  <button
+                    onClick={() => selectConversation(c)}
+                    className="w-full text-left px-2 py-2 flex items-start gap-2"
+                    title={c.title ?? ""}
+                  >
+                    <span className="text-sm leading-none mt-0.5 shrink-0">
+                      {agentEmojiById[c.agent_id] ?? "·"}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <div
+                        className={cn(
+                          "text-xs truncate pr-6",
+                          active ? "text-white" : "text-text-soft"
+                        )}
+                      >
+                        {c.title || "(sem título)"}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                        <span>{relativeTime(c.updated_at)}</span>
+                        {typeof c.message_count === "number" && (
+                          <>
+                            <span className="opacity-40">·</span>
+                            <span>{c.message_count} msg</span>
+                          </>
+                        )}
+                      </div>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => deleteConversation(c.id)}
+                    className={cn(
+                      "absolute top-1.5 right-1.5 p-1 rounded transition-opacity",
+                      "opacity-0 group-hover:opacity-70 hover:opacity-100",
+                      "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    )}
+                    title="Excluir conversa"
+                    aria-label="Excluir"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
 
