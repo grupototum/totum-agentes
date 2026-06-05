@@ -184,7 +184,8 @@ export async function processImage(
       .rotate() // applies EXIF orientation then drops it
       .withMetadata({}) // reset metadata
       .toBuffer();
-    return { buffer: out, exifStripped: true };
+    // Re-normaliza o tipo (sharp retorna Buffer<ArrayBufferLike>, callers querem Buffer<ArrayBuffer>)
+    return { buffer: Buffer.from(out), exifStripped: true };
   } catch {
     // Se sharp falhar (corrupto), recusa
     throw new UploadError(400, "image_invalid", "Imagem corrompida ou inválida");
