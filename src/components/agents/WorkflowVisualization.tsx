@@ -21,15 +21,6 @@ export function WorkflowVisualization() {
 
   return (
     <div ref={ref} className="totum-card-brand p-6 md:p-8">
-      <header className="mb-6">
-        <h3 className="text-xl font-normal text-white tracking-title">
-          Como o time trabalha
-        </h3>
-        <p className="text-sm text-text-soft mt-1">
-          Cascata Circular: {orchestrator.name} decide, delega, sintetiza.
-        </p>
-      </header>
-
       <div className="flex md:items-center gap-3 md:gap-2 overflow-x-auto pb-3 -mx-2 px-2 snap-x snap-mandatory md:snap-none">
         {STEPS.map((step, i) => (
           <React.Fragment key={step.id}>

@@ -119,7 +119,7 @@ export default async function AgentsPage() {
               Fluxo de trabalho
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Como uma pergunta vira resposta — Cascata Circular.
+              Cascata Circular: {orchestrator.name} decide, delega, sintetiza.
             </p>
           </div>
           <WorkflowVisualization />
