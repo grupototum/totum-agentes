@@ -8,6 +8,11 @@ import { cn } from "@/lib/utils";
 import { streamSSE } from "@/lib/sse-client";
 import { relativeTime } from "@/lib/format";
 import { MessageContent } from "@/components/chat/MessageContent";
+import { AttachmentInput } from "@/components/chat/AttachmentInput";
+import { AttachmentPreview } from "@/components/chat/AttachmentPreview";
+import { AttachmentRender } from "@/components/chat/AttachmentRender";
+import type { AttachmentMeta } from "@/components/chat/attachment-types";
+import { useUploader } from "@/lib/use-uploader";
 
 interface Message {
   id: string;
@@ -15,6 +20,7 @@ interface Message {
   content: string;
   created_at: string;
   agent_id?: string | null;
+  attachments?: AttachmentMeta[];
 }
 
 interface Conversation {
@@ -46,7 +52,11 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
   const [streamingText, setStreamingText] = useState<string>("");
   const [pulseTick, setPulseTick] = useState<number>(0);
   const [convScope, setConvScope] = useState<ConvScope>("agent");
+  const [dragActive, setDragActive] = useState(false);
+  const dragCounter = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const uploader = useUploader({ conversationId: activeConvId });
 
   const loadConversations = useCallback(
     async (agentId: string, scope: ConvScope = "agent") => {
@@ -83,18 +93,36 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || sending) return;
+    if (uploader.anyUploading) {
+      toast.error("Aguarde os anexos terminarem o upload");
+      return;
+    }
     setSending(true);
     setInput("");
     setStreamingText("");
     setPulseTick(0);
+    const attachmentIds = uploader.readyIds;
+    // snapshot dos pending pra reuse no optimistic bubble
+    const optimisticAtts: AttachmentMeta[] = uploader.pending
+      .filter((p) => p.status === "done" && p.serverId && p.url)
+      .map((p) => ({
+        id: p.serverId!,
+        name: p.file.name,
+        size: p.file.size,
+        type: p.file.type,
+        kind: p.kind ?? (p.file.type.startsWith("image/") ? "image" : "markdown"),
+        url: p.url!,
+      }));
     const optimistic: Message = {
       id: `tmp-${Date.now()}`,
       role: "user",
       content: text,
       created_at: new Date().toISOString(),
       agent_id: agent.id,
+      attachments: optimisticAtts.length > 0 ? optimisticAtts : undefined,
     };
     setMessages((m) => [...m, optimistic]);
+    uploader.reset();
 
     let acc = "";
     let streamedConvId: string | null = activeConvId;
@@ -111,6 +139,7 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
             agent_id: agent.id,
             content: text,
             conversation_id: activeConvId,
+            attachment_ids: attachmentIds,
           }),
         },
         (ev) => {
@@ -172,7 +201,36 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
       setPulseTick(0);
       setSending(false);
     }
-  }, [input, sending, agent.id, activeConvId, loadConversations, convScope]);
+  }, [input, sending, agent.id, activeConvId, loadConversations, convScope, uploader]);
+
+  // Drag-drop handlers no <main> do chat
+  const onDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    e.preventDefault();
+    dragCounter.current += 1;
+    setDragActive(true);
+  }, []);
+  const onDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setDragActive(false);
+    }
+  }, []);
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+  }, []);
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      dragCounter.current = 0;
+      setDragActive(false);
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) uploader.addFiles(files);
+    },
+    [uploader]
+  );
 
   const newConversation = useCallback(() => {
     setActiveConvId(null);
@@ -402,7 +460,35 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
       </aside>
 
       {/* Main chat */}
-      <main className="flex flex-1 flex-col min-w-0 bg-surface">
+      <main
+        className="relative flex flex-1 flex-col min-w-0 bg-surface"
+        onDragEnter={onDragEnter}
+        onDragLeave={onDragLeave}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
+        {/* Drag-drop overlay */}
+        {dragActive && (
+          <div
+            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+            style={{
+              background: "rgba(218,33,40,0.06)",
+              backdropFilter: "blur(2px)",
+            }}
+          >
+            <div
+              className="px-6 py-4 rounded-2xl text-sm text-white font-normal"
+              style={{
+                background: "var(--neutral)",
+                boxShadow: "inset 0 0 0 2px var(--primary), 0 0 40px -8px var(--primary)",
+                border: "2px dashed var(--primary)",
+              }}
+            >
+              Solte pra anexar (até 5 arquivos, 10MB cada)
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <header
           className="flex items-center gap-3 px-8 py-5"
@@ -480,6 +566,9 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
                     content={m.content}
                     variant={isUser ? "user" : isSystem ? "system" : "assistant"}
                   />
+                  {m.attachments && m.attachments.length > 0 && (
+                    <AttachmentRender attachments={m.attachments} />
+                  )}
                 </div>
                 {isUser && (
                   <div className="h-8 w-8 rounded-full bg-elevated flex items-center justify-center shrink-0">
@@ -523,7 +612,7 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
+        {/* Input + Anexos */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -532,10 +621,12 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
           className="px-8 py-5"
           style={{ boxShadow: "inset 0 1px 0 hsla(0,0%,100%,0.08)" }}
         >
+          <AttachmentPreview pending={uploader.pending} onRemove={uploader.removePending} />
           <div
-            className="flex items-end gap-2 bg-elevated rounded-2xl px-4 py-3"
+            className="flex items-end gap-2 bg-elevated rounded-2xl px-3 py-2"
             style={{ boxShadow: "inset 0 0 0 1px hsla(0,0%,100%,0.06)" }}
           >
+            <AttachmentInput onAdd={uploader.addFiles} disabled={sending} />
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -547,11 +638,11 @@ export default function ChatClient({ agents, user, initialAgentId }: Props) {
               }}
               placeholder={`Mensagem para ${agent.name}…`}
               rows={1}
-              className="flex-1 resize-none bg-transparent text-sm text-white placeholder:text-muted-foreground focus:outline-none max-h-40 leading-relaxed py-1"
+              className="flex-1 resize-none bg-transparent text-sm text-white placeholder:text-muted-foreground focus:outline-none max-h-40 leading-relaxed py-2"
             />
             <button
               type="submit"
-              disabled={sending || !input.trim()}
+              disabled={sending || !input.trim() || uploader.anyUploading}
               className="rounded-full h-9 w-9 flex items-center justify-center disabled:opacity-40 transition-shadow"
               style={{
                 background:
