@@ -200,7 +200,7 @@ export async function persistAttachment(input: {
   userId: string;
   kcSub: string;
   conversationId?: string | null;
-  buffer: Buffer;
+  buffer: Buffer | Uint8Array;
   mime: string;
   ext: string;
   kind: AttachmentKind;

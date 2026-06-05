@@ -141,7 +141,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // EXIF strip (somente imagens) — passa buffer normalizado
-  let processedBuf = buf;
+  // Tipa como Uint8Array (supertipo de ambos Buffer<ArrayBuffer> e Buffer<ArrayBufferLike>)
+  let processedBuf: Buffer | Uint8Array = buf;
   let exifStripped = false;
   if (detected.kind === "image") {
     try {
