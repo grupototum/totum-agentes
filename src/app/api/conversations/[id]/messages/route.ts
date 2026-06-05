@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { query } from "@/lib/db";
+import { attachmentsByMessages } from "@/lib/attachments-context";
+import type { AttachmentRow } from "@/lib/uploads";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +12,17 @@ interface MessageRow {
   content: string;
   agent_id: string | null;
   created_at: string;
+}
+
+interface MessageWithAttachments extends MessageRow {
+  attachments: Array<{
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    kind: AttachmentRow["kind"];
+    url: string;
+  }>;
 }
 
 export async function GET(
@@ -32,5 +45,19 @@ export async function GET(
      FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
     [id]
   );
-  return NextResponse.json({ messages: rows });
+
+  const attMap = await attachmentsByMessages(rows.map((m) => m.id));
+  const withAtts: MessageWithAttachments[] = rows.map((m) => ({
+    ...m,
+    attachments: (attMap.get(m.id) ?? []).map((a) => ({
+      id: a.id,
+      name: a.original_name,
+      size: a.size_bytes,
+      type: a.mime_type,
+      kind: a.kind,
+      url: `/api/uploads/${a.id}`,
+    })),
+  }));
+
+  return NextResponse.json({ messages: withAtts });
 }

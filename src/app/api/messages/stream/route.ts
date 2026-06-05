@@ -3,6 +3,12 @@ import { getSession } from "@/lib/session";
 import { query } from "@/lib/db";
 import { findAgent } from "@/lib/agents";
 import { askAgent } from "@/lib/gateway";
+import {
+  buildAgentContext,
+  linkAttachmentsToMessage,
+  loadOwnedAttachments,
+} from "@/lib/attachments-context";
+import { LIMITS } from "@/lib/uploads";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -11,6 +17,7 @@ interface PostBody {
   agent_id?: string;
   content?: string;
   conversation_id?: string | null;
+  attachment_ids?: string[];
 }
 
 function sseEncode(event: string, data: unknown): Uint8Array {
@@ -26,6 +33,10 @@ function sseEncode(event: string, data: unknown): Uint8Array {
  * - quando turn termina, faz chunked write da resposta word-by-word
  *   (micro-delay 18ms entre chunks pra efeito ChatGPT)
  * - emite "done" com message_id + created_at no final
+ *
+ * Anexos (PR C):
+ * - attachment_ids[] no body são linkados à user message + injetados como
+ *   contexto no prompt do agente via buildAgentContext()
  */
 export async function POST(req: NextRequest): Promise<Response> {
   const session = await getSession();
@@ -42,8 +53,13 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const agentId = String(body.agent_id ?? "").trim();
   const content = String(body.content ?? "").trim();
+  const attachmentIds = Array.isArray(body.attachment_ids) ? body.attachment_ids : [];
+
   if (!agentId || !content) {
     return new Response("missing_fields", { status: 400 });
+  }
+  if (attachmentIds.length > LIMITS.MAX_PER_TURN) {
+    return new Response("too_many_attachments", { status: 400 });
   }
   const agent = findAgent(agentId);
   if (!agent) {
@@ -70,12 +86,33 @@ export async function POST(req: NextRequest): Promise<Response> {
     conversationId = rows[0].id;
   }
 
-  // Persiste user message
-  await query(
+  // Carrega attachments + valida ownership + conversa (antes da escrita)
+  const ownedAttachments = await loadOwnedAttachments(
+    session.uid,
+    attachmentIds,
+    conversationId
+  );
+  if (ownedAttachments.length !== attachmentIds.length) {
+    return new Response("invalid_attachments", { status: 400 });
+  }
+
+  // Persiste user message + vincula attachments
+  const userMsg = await query<{ id: string }>(
     `INSERT INTO messages (conversation_id, role, content, agent_id)
-     VALUES ($1, 'user', $2, $3)`,
+     VALUES ($1, 'user', $2, $3) RETURNING id`,
     [conversationId, content, agentId]
   );
+  if (ownedAttachments.length > 0) {
+    await linkAttachmentsToMessage(
+      ownedAttachments.map((a) => a.id),
+      userMsg.rows[0].id,
+      conversationId
+    );
+  }
+
+  // Monta prompt com contexto dos attachments
+  const ctx = await buildAgentContext(ownedAttachments);
+  const promptForAgent = ctx + content;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -87,7 +124,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         }
       };
 
-      send("meta", { conversation_id: conversationId });
+      send("meta", {
+        conversation_id: conversationId,
+        user_message_id: userMsg.rows[0].id,
+      });
 
       // Pulse interval enquanto turn não termina
       let pulseCount = 0;
@@ -99,7 +139,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       let agentText = "";
       let agentErr: string | null = null;
       try {
-        const res = await askAgent({ agentId, message: content });
+        const res = await askAgent({ agentId, message: promptForAgent });
         agentText = res.content || "(sem resposta)";
       } catch (err) {
         agentErr = err instanceof Error ? err.message : "gateway_error";
@@ -119,7 +159,6 @@ export async function POST(req: NextRequest): Promise<Response> {
         return;
       }
 
-      // Persiste assistant message (full) ANTES do streaming visual
       const inserted = await query<{ id: string; created_at: string }>(
         `INSERT INTO messages (conversation_id, role, content, agent_id)
          VALUES ($1, 'assistant', $2, $3)
@@ -128,7 +167,6 @@ export async function POST(req: NextRequest): Promise<Response> {
       );
       await query(`UPDATE conversations SET updated_at = now() WHERE id = $1`, [conversationId]);
 
-      // Chunk em "tokens" (palavras + whitespace). 18ms delay.
       const tokens = agentText.match(/\S+\s*|\s+/g) ?? [agentText];
       send("start", { message_id: inserted.rows[0].id });
       for (const tok of tokens) {
@@ -142,7 +180,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       controller.close();
     },
     cancel() {
-      // client disconnected — nothing to clean (CLI já terminou ou continua mas resposta foi persistida)
+      // client disconnected — nothing to clean
     },
   });
 
@@ -151,7 +189,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
-      "X-Accel-Buffering": "no", // desabilita buffer nginx-like
+      "X-Accel-Buffering": "no",
     },
   });
 }
